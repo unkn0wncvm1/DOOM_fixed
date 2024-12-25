@@ -36,6 +36,7 @@
 //-----------------------------------------------------------------------------
 
 
+#include <string.h>
 static const char rcsid[] = "$Id: soundsrv.c,v 1.3 1997/01/29 22:40:44 b1 Exp $";
 
 
@@ -54,7 +55,12 @@ static const char rcsid[] = "$Id: soundsrv.c,v 1.3 1997/01/29 22:40:44 b1 Exp $"
 #include "sounds.h"
 #include "soundsrv.h"
 #include "wadread.h"
-
+#include <alsa/asoundlib.h>
+snd_pcm_t *handle;
+snd_pcm_hw_params_t *params;
+unsigned int sampleRate = 11025;
+int dir;
+snd_pcm_uframes_t frames;
 
 
 //
@@ -407,12 +413,9 @@ static struct timeval		last={0,0};
 
 static struct timezone		whocares;
 
-void updatesounds(void)
-{
-
+void updatesounds(void) {
     mix();
-    I_SubmitOutputBuffer(mixbuffer, SAMPLECOUNT);
-
+    snd_pcm_writei(handle, mixbuffer, frames);
 }
 
 int
@@ -534,46 +537,53 @@ void outputushort(int num)
     }
 }
 
-void initdata(void)
-{
-
-    int		i;
-    int		j;
+void initdata(void) {
+    int i;
+    int j;
     
-    int*	steptablemid = steptable + 128;
-
-    for (i=0 ;
-	 i<sizeof(channels)/sizeof(unsigned char *) ;
-	 i++)
-    {
-	channels[i] = 0;
+    int* steptablemid = steptable + 128;
+    for (i=0 ; i<sizeof(channels)/sizeof(unsigned char *) ; i++) {
+        channels[i] = 0;
     }
     
     gettimeofday(&last, &whocares);
 
     for (i=-128 ; i<128 ; i++)
-	steptablemid[i] = pow(2.0, (i/64.0))*65536.0;
+        steptablemid[i] = pow(2.0, (i/64.0))*65536.0;
 
-    // generates volume lookup tables
-    //  which also turn the unsigned samples
-    //  into signed samples
-    // for (i=0 ; i<128 ; i++)
-    // for (j=0 ; j<256 ; j++)
-    // vol_lookup[i*256+j] = (i*(j-128))/127;
-    
     for (i=0 ; i<128 ; i++)
-	for (j=0 ; j<256 ; j++)
-	    vol_lookup[i*256+j] = (i*(j-128)*256)/127;
+        for (j=0 ; j<256 ; j++)
+            vol_lookup[i*256+j] = (i*(j-128)*256)/127;
 
+    // Initialize ALSA
+    if (snd_pcm_open(&handle, "default", SND_PCM_STREAM_PLAYBACK, 0) < 0) {
+        fprintf(stderr, "Unable to open PCM device\n");
+        exit(1);
+    }
+
+    snd_pcm_hw_params_malloc(&params);
+    snd_pcm_hw_params_any(handle, params);
+    snd_pcm_hw_params_set_access(handle, params, SND_PCM_ACCESS_RW_INTERLEAVED);
+    snd_pcm_hw_params_set_format(handle, params, SND_PCM_FORMAT_S16_LE);
+    snd_pcm_hw_params_set_channels(handle, params, 2);
+    snd_pcm_hw_params_set_rate_near(handle, params, &sampleRate, &dir);
+
+    if (snd_pcm_hw_params(handle, params) < 0) {
+        fprintf(stderr, "Unable to set HW parameters\n");
+        exit(1);
+    }
+
+    snd_pcm_hw_params_free(params);
+    frames = 32;
 }
 
 
 
-
-void quit(void)
-{
+void quit(void) {
     I_ShutdownMusic();
     I_ShutdownSound();
+    snd_pcm_drain(handle);
+    snd_pcm_close(handle);
     exit(0);
 }
 

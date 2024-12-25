@@ -9,7 +9,7 @@
 CC=gcc
 CFLAGS=-O -DNORMALUNIX -DLINUX
 LDFLAGS=
-LIBS=-lm
+LIBS=-lm -lasound
 
 O=linux
 

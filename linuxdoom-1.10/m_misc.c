@@ -32,7 +32,7 @@ rcsid[] = "$Id: m_misc.c,v 1.6 1997/02/03 22:45:10 b1 Exp $";
 #include <fcntl.h>
 #include <stdlib.h>
 #include <unistd.h>
-
+#include <stdint.h>
 #include <ctype.h>
 
 
@@ -231,71 +231,30 @@ typedef struct
     int		untranslated;		// lousy hack
 } default_t;
 
-default_t	defaults[] =
-{
-    {"mouse_sensitivity",&mouseSensitivity, 5},
-    {"sfx_volume",&snd_SfxVolume, 8},
-    {"music_volume",&snd_MusicVolume, 8},
-    {"show_messages",&showMessages, 1},
-    
-
-#ifdef NORMALUNIX
-    {"key_right",&key_right, KEY_RIGHTARROW},
-    {"key_left",&key_left, KEY_LEFTARROW},
-    {"key_up",&key_up, KEY_UPARROW},
-    {"key_down",&key_down, KEY_DOWNARROW},
-    {"key_strafeleft",&key_strafeleft, ','},
-    {"key_straferight",&key_straferight, '.'},
-
-    {"key_fire",&key_fire, KEY_RCTRL},
-    {"key_use",&key_use, ' '},
-    {"key_strafe",&key_strafe, KEY_RALT},
-    {"key_speed",&key_speed, KEY_RSHIFT},
-
-// UNIX hack, to be removed. 
-#ifdef SNDSERV
-    {"sndserver", (int *) &sndserver_filename, (void*) "sndserver"},
-    {"mb_used", &mb_used, 2},
-#endif
-    
-#endif
-
-#ifdef LINUX
-    {"mousedev", (int*)&mousedev, (void*)"/dev/ttyS0"},
-    {"mousetype", (int*)&mousetype, (void*)"microsoft"},
-#endif
-
-    {"use_mouse",&usemouse, 1},
-    {"mouseb_fire",&mousebfire,0},
-    {"mouseb_strafe",&mousebstrafe,1},
-    {"mouseb_forward",&mousebforward,2},
-
-    {"use_joystick",&usejoystick, 0},
-    {"joyb_fire",&joybfire,0},
-    {"joyb_strafe",&joybstrafe,1},
-    {"joyb_use",&joybuse,3},
-    {"joyb_speed",&joybspeed,2},
-
-    {"screenblocks",&screenblocks, 9},
-    {"detaillevel",&detailLevel, 0},
-
-    {"snd_channels",&numChannels, 3},
-
-
-
-    {"usegamma",&usegamma, 0},
-
-    {"chatmacro0", (int *) &chat_macros[0], (void*) HUSTR_CHATMACRO0 },
-    {"chatmacro1", (int *) &chat_macros[1], (void*) HUSTR_CHATMACRO1 },
-    {"chatmacro2", (int *) &chat_macros[2], (void*) HUSTR_CHATMACRO2 },
-    {"chatmacro3", (int *) &chat_macros[3], (void*) HUSTR_CHATMACRO3 },
-    {"chatmacro4", (int *) &chat_macros[4], (void*) HUSTR_CHATMACRO4 },
-    {"chatmacro5", (int *) &chat_macros[5], (void*) HUSTR_CHATMACRO5 },
-    {"chatmacro6", (int *) &chat_macros[6], (void*) HUSTR_CHATMACRO6 },
-    {"chatmacro7", (int *) &chat_macros[7], (void*) HUSTR_CHATMACRO7 },
-    {"chatmacro8", (int *) &chat_macros[8], (void*) HUSTR_CHATMACRO8 },
-    {"chatmacro9", (int *) &chat_macros[9], (void*) HUSTR_CHATMACRO9 }
-
+default_t defaults[] = {
+    {"mouse_sensitivity", &mouseSensitivity, (void *)(intptr_t)5},
+    {"sfx_volume", &snd_SfxVolume, (void *)(intptr_t)8},
+    {"music_volume", &snd_MusicVolume, (void *)(intptr_t)8},
+    {"show_messages", &showMessages, (void *)(intptr_t)1},
+    {"key_right", &key_right, (void *)(intptr_t)KEY_RIGHTARROW},
+    {"key_left", &key_left, (void *)(intptr_t)KEY_LEFTARROW},
+    {"key_up", &key_up, (void *)(intptr_t)KEY_UPARROW},
+    {"key_down", &key_down, (void *)(intptr_t)KEY_DOWNARROW},
+    {"key_strafeleft", &key_strafeleft, (void *)(intptr_t)','},
+    {"key_straferight", &key_straferight, (void *)(intptr_t)'.'},
+    {"key_fire", &key_fire, (void *)(intptr_t)KEY_RCTRL},
+    {"key_use", &key_use, (void *)(intptr_t)' '},
+    {"key_strafe", &key_strafe, (void *)(intptr_t)KEY_RALT},
+    {"key_speed", &key_speed, (void *)(intptr_t)KEY_RSHIFT},
+    {"mb_used", &mb_used, (void *)(intptr_t)2},
+    {"use_mouse", &usemouse, (void *)(intptr_t)1},
+    {"mouseb_strafe", &mousebstrafe, (void *)(intptr_t)1},
+    {"mouseb_forward", &mousebforward, (void *)(intptr_t)2},
+    {"joyb_strafe", &joybstrafe, (void *)(intptr_t)1},
+    {"joyb_use", &joybuse, (void *)(intptr_t)3},
+    {"joyb_speed", &joybspeed, (void *)(intptr_t)2},
+    {"screenblocks", &screenblocks, (void *)(intptr_t)9},
+    {"snd_channels", &numChannels, (void *)(intptr_t)3},
 };
 
 int	numdefaults;
@@ -351,7 +310,7 @@ void M_LoadDefaults (void)
     // set everything to base values
     numdefaults = sizeof(defaults)/sizeof(defaults[0]);
     for (i=0 ; i<numdefaults ; i++)
-	*defaults[i].location = defaults[i].defaultvalue;
+	    *defaults[i].location = (intptr_t)newstring;
     
     // check for a custom default file
     i = M_CheckParm ("-config");

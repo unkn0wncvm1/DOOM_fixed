@@ -33,86 +33,66 @@
 //-----------------------------------------------------------------------------
 
 static const char rcsid[] = "$Id: linux.c,v 1.3 1997/01/26 07:45:01 b1 Exp $";
-
 #include <errno.h>
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
-
-#include <linux/soundcard.h>
-
+#include <sys/ioctl.h>
+#include <alsa/asoundlib.h>
 #include "soundsrv.h"
 
-int	audio_fd;
+extern snd_pcm_t *handle;
+extern snd_pcm_hw_params_t *params;
+extern unsigned int sampleRate;
+extern int dir;
+extern snd_pcm_uframes_t frames;
 
-void
-myioctl
-( int	fd,
-  int	command,
-  int*	arg )
-{   
-    int		rc;
-    
-    rc = ioctl(fd, command, arg);  
-    if (rc < 0)
-    {
-	fprintf(stderr, "ioctl(dsp,%d,arg) failed\n", command);
-	fprintf(stderr, "errno=%d\n", errno);
-	exit(-1);
+void myioctl(int fd, int command, int *arg) {
+    int rc = ioctl(fd, command, arg);
+    if (rc < 0) {
+        fprintf(stderr, "ioctl(dsp,%d,arg) failed\n", command);
+        fprintf(stderr, "errno=%d\n", errno);
+        exit(-1);
     }
 }
 
-void I_InitMusic(void)
-{
+void I_InitMusic(void) {
+    // ALSA does not need specific initialization for music
 }
 
-void
-I_InitSound
-( int	samplerate,
-  int	samplesize )
-{
+void I_InitSound(int samplerate, int samplesize) {
+    // Initialize ALSA
+    if (snd_pcm_open(&handle, "default", SND_PCM_STREAM_PLAYBACK, 0) < 0) {
+        fprintf(stderr, "Unable to open PCM device\n");
+        exit(1);
+    }
 
-    int i;
-                
-    audio_fd = open("/dev/dsp", O_WRONLY);
-    if (audio_fd<0)
-        fprintf(stderr, "Could not open /dev/dsp\n");
-         
-                     
-    i = 11 | (2<<16);                                           
-    myioctl(audio_fd, SNDCTL_DSP_SETFRAGMENT, &i);
-                    
-    myioctl(audio_fd, SNDCTL_DSP_RESET, 0);
-    i=11025;
-    myioctl(audio_fd, SNDCTL_DSP_SPEED, &i);
-    i=1;    
-    myioctl(audio_fd, SNDCTL_DSP_STEREO, &i);
-            
-    myioctl(audio_fd, SNDCTL_DSP_GETFMTS, &i);
-    if (i&=AFMT_S16_LE)    
-        myioctl(audio_fd, SNDCTL_DSP_SETFMT, &i);
-    else
-        fprintf(stderr, "Could not play signed 16 data\n");
+    snd_pcm_hw_params_malloc(&params);
+    snd_pcm_hw_params_any(handle, params);
+    snd_pcm_hw_params_set_access(handle, params, SND_PCM_ACCESS_RW_INTERLEAVED);
+    snd_pcm_hw_params_set_format(handle, params, SND_PCM_FORMAT_S16_LE);
+    snd_pcm_hw_params_set_channels(handle, params, 2);
+    snd_pcm_hw_params_set_rate_near(handle, params, &sampleRate, &dir);
 
+    if (snd_pcm_hw_params(handle, params) < 0) {
+        fprintf(stderr, "Unable to set HW parameters\n");
+        exit(1);
+    }
+
+    snd_pcm_hw_params_free(params);
+    frames = 32;
 }
 
-void
-I_SubmitOutputBuffer
-( void*	samples,
-  int	samplecount )
-{
-    write(audio_fd, samples, samplecount*4);
+void I_SubmitOutputBuffer(void *samples, int samplecount) {
+    snd_pcm_writei(handle, samples, samplecount);
 }
 
-void I_ShutdownSound(void)
-{
-
-    close(audio_fd);
-
+void I_ShutdownSound(void) {
+    snd_pcm_drain(handle);
+    snd_pcm_close(handle);
 }
 
-void I_ShutdownMusic(void)
-{
+void I_ShutdownMusic(void) {
+    // ALSA does not need specific shutdown for music
 }
