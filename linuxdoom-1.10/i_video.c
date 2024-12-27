@@ -767,9 +767,12 @@ void I_InitGraphics(void)
 
     // use the default visual 
     X_screen = DefaultScreen(X_display);
-    if (!XMatchVisualInfo(X_display, X_screen, 8, PseudoColor, &X_visualinfo))
-	I_Error("xdoom currently only supports 256-color PseudoColor screens");
-    X_visual = X_visualinfo.visual;
+if (!XMatchVisualInfo(X_display, X_screen, 8, PseudoColor, &X_visualinfo)) {
+    if (!XMatchVisualInfo(X_display, X_screen, 24, TrueColor, &X_visualinfo)) {
+        I_Error("xdoom currently only supports 256-color PseudoColor or 24-bit TrueColor screens");
+    }
+}
+X_visual = X_visualinfo.visual;
 
     // check for the MITSHM extension
     doShm = XShmQueryExtension(X_display);
