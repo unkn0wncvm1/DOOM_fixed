@@ -822,12 +822,12 @@ X_mainWindow = XCreateWindow(X_display,
                 x, y,
                 X_width, X_height,
                 0, // borderwidth
-                8, // depth
+                X_visualinfo.depth, // depth
                 InputOutput,
                 X_visual,
                 attribmask,
                 &attribs);
-
+                
 XInstallColormap(X_display, X_cmap);
 XDefineCursor(X_display, X_mainWindow,
               createnullcursor(X_display, X_mainWindow));
@@ -863,10 +863,10 @@ if (grabMouse) {
 if (doShm) {
     X_shmeventtype = XShmGetEventBase(X_display) + ShmCompletion;
 
-    // Create the image
+    // Create the image with the correct depth
     image = XShmCreateImage(X_display,
                             X_visual,
-                            8,
+                            X_visualinfo.depth, // Correct depth
                             ZPixmap,
                             0,
                             &X_shminfo,
@@ -887,7 +887,7 @@ if (doShm) {
 } else {
     image = XCreateImage(X_display,
                          X_visual,
-                         8,
+                         X_visualinfo.depth, // Correct depth
                          ZPixmap,
                          0,
                          (char*)malloc(X_width * X_height),
