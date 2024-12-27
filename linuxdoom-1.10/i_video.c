@@ -535,47 +535,40 @@ void I_ReadScreen (byte* scr)
 //
 static XColor	colors[256];
 
-void UploadNewPalette(Colormap cmap, byte *palette)
-{
-
-    register int	i;
-    register int	c;
-    static boolean	firstcall = true;
+void UploadNewPalette(Colormap cmap, byte *palette) {
+    register int i;
+    register int c;
+    static boolean firstcall = true;
 
 #ifdef __cplusplus
     if (X_visualinfo.c_class == PseudoColor && X_visualinfo.depth == 8)
 #else
     if (X_visualinfo.class == PseudoColor && X_visualinfo.depth == 8)
 #endif
-	{
-	    // initialize the colormap
-	    if (firstcall)
-	    {
-		firstcall = false;
-		for (i=0 ; i<256 ; i++)
-		{
-		    colors[i].pixel = i;
-		    colors[i].flags = DoRed|DoGreen|DoBlue;
-		}
-	    }
+    {
+        // initialize the colormap
+        if (firstcall) {
+            firstcall = false;
+            for (i=0; i<256; i++) {
+                colors[i].pixel = i;
+                colors[i].flags = DoRed | DoGreen | DoBlue;
+            }
+        }
 
-	    // set the X colormap entries
-	    for (i=0 ; i<256 ; i++)
-	    {
-		c = gammatable[usegamma][*palette++];
-		colors[i].red = (c<<8) + c;
-		c = gammatable[usegamma][*palette++];
-		colors[i].green = (c<<8) + c;
-		c = gammatable[usegamma][*palette++];
-		colors[i].blue = (c<<8) + c;
-	    }
+        // set the X colormap entries
+        for (i=0; i<256; i++) {
+            c = gammatable[usegamma][*palette++];
+            colors[i].red = (c<<8) + c;
+            c = gammatable[usegamma][*palette++];
+            colors[i].green = (c<<8) + c;
+            c = gammatable[usegamma][*palette++];
+            colors[i].blue = (c<<8) + c;
+        }
 
-	    // store the colors to the current colormap
-	    XStoreColors(X_display, cmap, colors, 256);
-
-	}
+        // store the colors to the current colormap
+        XStoreColors(X_display, cmap, colors, 256);
+    }
 }
-
 //
 // I_SetPalette
 //
@@ -935,63 +928,39 @@ else
 		     GrabModeAsync, GrabModeAsync,
 		     X_mainWindow, None, CurrentTime);
 
-    if (doShm)
-    {
+if (doShm) {
+    X_shmeventtype = XShmGetEventBase(X_display) + ShmCompletion;
 
-	X_shmeventtype = XShmGetEventBase(X_display) + ShmCompletion;
+    image = XShmCreateImage(X_display,
+                            X_visual,
+                            X_visualinfo.depth,
+                            ZPixmap,
+                            0,
+                            &X_shminfo,
+                            X_width,
+                            X_height);
 
-	// create the image
-	image = XShmCreateImage(	X_display,
-					X_visual,
-					8,
-					ZPixmap,
-					0,
-					&X_shminfo,
-					X_width,
-					X_height );
+    grabsharedmemory(image->bytes_per_line * image->height);
 
-	grabsharedmemory(image->bytes_per_line * image->height);
-
-
-	// UNUSED
-	// create the shared memory segment
-	// X_shminfo.shmid = shmget (IPC_PRIVATE,
-	// image->bytes_per_line * image->height, IPC_CREAT | 0777);
-	// if (X_shminfo.shmid < 0)
-	// {
-	// perror("");
-	// I_Error("shmget() failed in InitGraphics()");
-	// }
-	// fprintf(stderr, "shared memory id=%d\n", X_shminfo.shmid);
-	// attach to the shared memory segment
-	// image->data = X_shminfo.shmaddr = shmat(X_shminfo.shmid, 0, 0);
-	
-
-	if (!image->data)
-	{
-	    perror("");
-	    I_Error("shmat() failed in InitGraphics()");
-	}
-
-	// get the X server to attach to it
-	if (!XShmAttach(X_display, &X_shminfo))
-	    I_Error("XShmAttach() failed in InitGraphics()");
-
-    }
-    else
-    {
-	image = XCreateImage(	X_display,
-    				X_visual,
-    				8,
-    				ZPixmap,
-    				0,
-    				(char*)malloc(X_width * X_height),
-    				X_width, X_height,
-    				8,
-    				X_width );
-
+    if (!image->data) {
+        perror("");
+        I_Error("shmat() failed in InitGraphics()");
     }
 
+    if (!XShmAttach(X_display, &X_shminfo))
+        I_Error("XShmAttach() failed in InitGraphics()");
+
+} else {
+    image = XCreateImage(X_display,
+                         X_visual,
+                         X_visualinfo.depth,
+                         ZPixmap,
+                         0,
+                         (char*)malloc(X_width * X_height * (X_visualinfo.depth / 8)),
+                         X_width, X_height,
+                         8,
+                         0); // Ensure image data is correctly allocated
+}
     if (multiply == 1)
 	screens[0] = (unsigned char *) (image->data);
     else
