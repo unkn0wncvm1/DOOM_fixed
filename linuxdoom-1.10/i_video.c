@@ -774,7 +774,12 @@ if (!XMatchVisualInfo(X_display, X_screen, 8, PseudoColor, &X_visualinfo)) {
 }
 X_visual = X_visualinfo.visual;
 
-    // check for the MITSHM extension
+// Adjust colormap creation based on visual depth
+if (X_visualinfo.depth == 24) {
+    X_cmap = XCreateColormap(X_display, RootWindow(X_display, X_screen), X_visual, AllocNone);
+} else {
+    X_cmap = XCreateColormap(X_display, RootWindow(X_display, X_screen), X_visual, AllocAll);
+}    // check for the MITSHM extension
     doShm = XShmQueryExtension(X_display);
 
     // even if it's available, make sure it's a local connection
