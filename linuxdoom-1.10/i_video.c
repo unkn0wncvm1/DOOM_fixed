@@ -775,54 +775,131 @@ if (!XMatchVisualInfo(X_display, X_screen, 8, PseudoColor, &X_visualinfo)) {
 X_visual = X_visualinfo.visual;
 
 // Adjust colormap creation based on visual depth
+if (!XMatchVisualInfo(X_display, X_screen, 8, PseudoColor, &X_visualinfo)) {
+    if (!XMatchVisualInfo(X_display, X_screen, 24, TrueColor, &X_visualinfo)) {
+        I_Error("xdoom currently only supports 256-color PseudoColor or 24-bit TrueColor screens");
+    }
+}
+X_visual = X_visualinfo.visual;
+
+// Adjust colormap creation based on visual depth
 if (X_visualinfo.depth == 24) {
     X_cmap = XCreateColormap(X_display, RootWindow(X_display, X_screen), X_visual, AllocNone);
 } else {
     X_cmap = XCreateColormap(X_display, RootWindow(X_display, X_screen), X_visual, AllocAll);
-}    // check for the MITSHM extension
-    doShm = XShmQueryExtension(X_display);
+}
 
-    // even if it's available, make sure it's a local connection
-    if (doShm)
-    {
-	if (!displayname) displayname = (char *) getenv("DISPLAY");
-	if (displayname)
-	{
-	    d = displayname;
-	    while (*d && (*d != ':')) d++;
-	    if (*d) *d = 0;
-	    if (!(!strcasecmp(displayname, "unix") || !*displayname)) doShm = false;
-	}
+// Check for the MITSHM extension
+doShm = XShmQueryExtension(X_display);
+
+// Even if it's available, make sure it's a local connection
+if (doShm) {
+    if (!displayname) displayname = (char *) getenv("DISPLAY");
+    if (displayname) {
+        d = displayname;
+        while (*d && (*d != ':')) d++;
+        if (*d) *d = 0;
+        if (!(!strcasecmp(displayname, "unix") || !*displayname)) doShm = false;
+    }
+}
+
+fprintf(stderr, "Using MITSHM extension\n");
+
+// Setup attributes for main window
+attribmask = CWEventMask | CWColormap | CWBorderPixel;
+attribs.event_mask =
+    KeyPressMask
+    | KeyReleaseMask
+    // | PointerMotionMask | ButtonPressMask | ButtonReleaseMask
+    | ExposureMask;
+
+attribs.colormap = X_cmap;
+attribs.border_pixel = 0;
+
+// Create the main window
+X_mainWindow = XCreateWindow(X_display,
+                RootWindow(X_display, X_screen),
+                x, y,
+                X_width, X_height,
+                0, // borderwidth
+                8, // depth
+                InputOutput,
+                X_visual,
+                attribmask,
+                &attribs);
+
+XInstallColormap(X_display, X_cmap);
+XDefineCursor(X_display, X_mainWindow,
+              createnullcursor(X_display, X_mainWindow));
+
+// Create the GC
+valuemask = GCGraphicsExposures;
+xgcvalues.graphics_exposures = False;
+X_gc = XCreateGC(X_display,
+                 X_mainWindow,
+                 valuemask,
+                 &xgcvalues);
+
+// Map the window
+XMapWindow(X_display, X_mainWindow);
+
+// Wait until it is OK to draw
+oktodraw = 0;
+while (!oktodraw) {
+    XNextEvent(X_display, &X_event);
+    if (X_event.type == Expose && !X_event.xexpose.count) {
+        oktodraw = 1;
+    }
+}
+
+// Grabs the pointer so it is restricted to this window
+if (grabMouse) {
+    XGrabPointer(X_display, X_mainWindow, True,
+                 ButtonPressMask|ButtonReleaseMask|PointerMotionMask,
+                 GrabModeAsync, GrabModeAsync,
+                 X_mainWindow, None, CurrentTime);
+}
+
+if (doShm) {
+    X_shmeventtype = XShmGetEventBase(X_display) + ShmCompletion;
+
+    // Create the image
+    image = XShmCreateImage(X_display,
+                            X_visual,
+                            8,
+                            ZPixmap,
+                            0,
+                            &X_shminfo,
+                            X_width,
+                            X_height);
+
+    grabsharedmemory(image->bytes_per_line * image->height);
+
+    if (!image->data) {
+        perror("");
+        I_Error("shmat() failed in InitGraphics()");
     }
 
-    fprintf(stderr, "Using MITSHM extension\n");
+    // Get the X server to attach to it
+    if (!XShmAttach(X_display, &X_shminfo))
+        I_Error("XShmAttach() failed in InitGraphics()");
 
-    // create the colormap
-    X_cmap = XCreateColormap(X_display, RootWindow(X_display,
-						   X_screen), X_visual, AllocAll);
+} else {
+    image = XCreateImage(X_display,
+                         X_visual,
+                         8,
+                         ZPixmap,
+                         0,
+                         (char*)malloc(X_width * X_height),
+                         X_width, X_height,
+                         8,
+                         X_width);
+}
 
-    // setup attributes for main window
-    attribmask = CWEventMask | CWColormap | CWBorderPixel;
-    attribs.event_mask =
-	KeyPressMask
-	| KeyReleaseMask
-	// | PointerMotionMask | ButtonPressMask | ButtonReleaseMask
-	| ExposureMask;
-
-    attribs.colormap = X_cmap;
-    attribs.border_pixel = 0;
-
-    // create the main window
-    X_mainWindow = XCreateWindow(	X_display,
-					RootWindow(X_display, X_screen),
-					x, y,
-					X_width, X_height,
-					0, // borderwidth
-					8, // depth
-					InputOutput,
-					X_visual,
-					attribmask,
-					&attribs );
+if (multiply == 1)
+    screens[0] = (unsigned char *) (image->data);
+else
+    screens[0] = (unsigned char *) malloc (SCREENWIDTH * SCREENHEIGHT);
 
     XInstallColormap( X_display, X_cmap );
     XDefineCursor(X_display, X_mainWindow,
